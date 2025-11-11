@@ -1,0 +1,32 @@
+{
+    "release-type": "node",
+    "package-name": "issue-milestoner",
+    "include-component-in-tag": false,
+    "bump-minor-pre-major": true,
+    "bump-patch-for-minor-pre-major": true,
+    "changelog-sections": [
+        {
+            "type": "feat",
+            "section": "Features"
+        },
+        {
+            "type": "fix",
+            "section": "Bug Fixes"
+        },
+        {
+            "type": "docs",
+            "section": "Documentation"
+        },
+        {
+            "type": "chore",
+            "section": "Miscellaneous"
+        },
+        {
+            "type": "ci",
+            "section": "CI/CD"
+        }
+    ],
+    "commit-search-depth": 500,
+    "pull-request-title-pattern": "chore: release ${version}",
+    "pull-request-header": "This PR was generated automatically by [Release Please](https://github.com/googleapis/release-please)."
+}

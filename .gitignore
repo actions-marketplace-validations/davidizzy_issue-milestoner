@@ -1,0 +1,12 @@
+# For JavaScript action (if keeping both versions)
+node_modules/
+dist/
+
+# Development files
+*.log
+.env
+.DS_Store
+.vscode/settings.json
+
+# Test coverage
+coverage/

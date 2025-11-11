@@ -1,0 +1,38 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+          package-name: issue-milestoner
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      # Validate the action when a release is created
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+        
+      - name: Validate shell scripts
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          # Check shell script syntax
+          bash -n assign-milestone.sh
+          bash -n test-local.sh
+          bash -n tests/test-composite.sh
+          
+      - name: Run tests
+        if: ${{ steps.release.outputs.release_created }}
+        run: ./tests/test-composite.sh
