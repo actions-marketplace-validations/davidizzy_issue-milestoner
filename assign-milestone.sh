@@ -25,7 +25,7 @@ retry_gh_command() {
   local max_attempts=${MAX_RETRY_ATTEMPTS}
   local attempt=1
   local delay=${INITIAL_RETRY_DELAY}
-  
+
   while (( attempt <= max_attempts )); do
     if "$@"; then
       return 0
@@ -35,7 +35,7 @@ retry_gh_command() {
     attempt=$((attempt + 1))
     delay=$((delay * 2))
   done
-  
+
   return 1
 }
 
@@ -100,54 +100,53 @@ validate_inputs() {
 
 # Fetch issue data from GitHub API
 fetch_issue_data() {
-  echo "::group::Fetching issue details"
-  
+  echo "::group::Fetching issue details" >&2
+
   local issue_data
   local temp_file="/tmp/gh_issue_data_$$"
-  
-  # Try to fetch with type field first (available for org repos with issue types configured)
+
+  # Fetch issue data using gh api (which supports all fields including type)
   # shellcheck disable=SC2310  # Intentionally using in if condition
-  if retry_gh_command gh issue view "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --json milestone,labels,title,state,type > "${temp_file}" 2>&1; then
-    issue_data=$(cat "${temp_file}")
+  if retry_gh_command gh api "repos/${REPOSITORY}/issues/${ISSUE_NUMBER}" > "${temp_file}" 2>&1; then
+    # Extract only the fields we need from the full API response
+    issue_data=$(jq '{milestone, labels, title, state, type}' < "${temp_file}" 2>/dev/null)
     rm -f "${temp_file}"
-  else
-    # If type field is not available, try without it
-    local error_msg
-    error_msg=$(cat "${temp_file}")
-    rm -f "${temp_file}"
-    
-    if [[ "${error_msg}" == *"Unknown JSON field: \"type\""* ]]; then
-      echo "::debug::Type field not available, fetching without it"
-      # shellcheck disable=SC2310  # Intentionally using in if condition
-      if retry_gh_command gh issue view "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --json milestone,labels,title,state > "${temp_file}" 2>&1; then
-        issue_data=$(cat "${temp_file}")
-        rm -f "${temp_file}"
-      else
-        rm -f "${temp_file}"
-        echo "::error::Failed to fetch issue data after ${MAX_RETRY_ATTEMPTS} attempts"
-        exit 1
-      fi
-    else
-      echo "::error::Failed to fetch issue data after ${MAX_RETRY_ATTEMPTS} attempts"
-      echo "::error::${error_msg}"
+
+    # If jq failed to extract data, the API response was likely an error
+    if [[ -z "${issue_data}" ]] || [[ "${issue_data}" == "null" ]]; then
+      echo "::error::Failed to extract issue data from API response" >&2
       exit 1
     fi
+  else
+    rm -f "${temp_file}"
+    echo "::error::Failed to fetch issue data after ${MAX_RETRY_ATTEMPTS} attempts" >&2
+    exit 1
   fi
 
   # Validate JSON parsing
-  if [[ -z "${issue_data}" ]] || ! echo "${issue_data}" | jq -e . >/dev/null 2>&1; then
-    echo "::error::Failed to parse issue data"
-    echo "::error::Received data: ${issue_data}"
+  if [[ -z "${issue_data}" ]] || ! jq -e . <<< "${issue_data}" >/dev/null 2>&1; then
+    echo "::error::Failed to parse issue data" >&2
+    echo "::error::Received data: ${issue_data}" >&2
     exit 1
   fi
 
   local issue_state
-  issue_state=$(echo "${issue_data}" | jq -r '.state')
-  
-  echo "::notice::Issue #${ISSUE_NUMBER}"
-  echo "::notice::Issue state: ${issue_state}"
-  echo "::endgroup::"
-  
+  issue_state=$(jq -r '.state' <<< "${issue_data}")
+
+  echo "::notice::Issue #${ISSUE_NUMBER}" >&2
+  echo "::notice::Issue state: ${issue_state}" >&2
+
+  # Debug: Check if type field exists in the fetched data
+  if jq -e 'has("type")' <<< "${issue_data}" >/dev/null 2>&1; then
+    local type_info
+    type_info=$(jq -r '.type | if type == "object" then .name else . end' <<< "${issue_data}" 2>/dev/null || echo "unknown")
+    echo "::debug::Issue type field detected in API response: ${type_info}" >&2
+  else
+    echo "::debug::No type field found in API response" >&2
+  fi
+
+  echo "::endgroup::" >&2
+
   echo "${issue_data}"
 }
 
@@ -164,22 +163,27 @@ check_existing_milestone() {
     echo "::notice::${reason}"
     return 1  # Signal to exit main
   fi
-  
+
   return 0
 }
 
 # Apply issue type filter if specified
 apply_type_filter() {
   local issue_data="$1"
-  
+
   # Skip if no filter specified - gracefully ignore lack of type field
   [[ -z "${ISSUE_TYPE}" ]] && return 0
-  
+
   echo "::group::Checking GitHub issue type filter"
-  
-  local issue_type_field
-  issue_type_field=$(echo "${issue_data}" | jq -r '.type // empty')
-  
+
+  local issue_type_field=""
+  # Check if type field exists first, then extract appropriately
+  # Use jq directly with variable to avoid shell expansion issues
+  if jq -e 'has("type")' <<< "${issue_data}" >/dev/null 2>&1; then
+    # Extract the type name if type is an object, or the type itself if it's a string
+    issue_type_field=$(jq -r 'if (.type | type) == "object" then .type.name else .type end' <<< "${issue_data}" 2>/dev/null || echo "")
+  fi
+
   # If type filter is specified but issue has no type field, error out
   if [[ -z "${issue_type_field}" ]]; then
     local reason="Issue type filter \"${ISSUE_TYPE}\" specified but issue has no type field. Issue types are only available for organization repositories with issue types configured."
@@ -188,12 +192,12 @@ apply_type_filter() {
     echo "::endgroup::"
     return 1  # Signal to exit main
   fi
-  
+
   # Compare type filter with issue type
   local issue_type_lower current_type_lower
   issue_type_lower=$(to_lowercase "${ISSUE_TYPE}")
   current_type_lower=$(to_lowercase "${issue_type_field}")
-  
+
   if [[ "${current_type_lower}" != "${issue_type_lower}" ]]; then
     local reason="Issue type filter \"${ISSUE_TYPE}\" does not match issue type: ${issue_type_field}"
     set_output "reason" "${reason}"
@@ -201,7 +205,7 @@ apply_type_filter() {
     echo "::endgroup::"
     return 1  # Signal to exit main
   fi
-  
+
   echo "::notice::Issue type matches filter: ${issue_type_field}"
   echo "::endgroup::"
   return 0
@@ -210,15 +214,15 @@ apply_type_filter() {
 # Apply label filter if specified
 apply_label_filter() {
   local issue_data="$1"
-  
+
   # Skip if no filter specified
   [[ -z "${ISSUE_LABEL}" ]] && return 0
-  
+
   echo "::group::Checking issue label filter"
-  
+
   local labels
   labels=$(echo "${issue_data}" | jq -r '.labels // [] | .[].name')
-  
+
   if [[ -z "${labels}" ]]; then
     local reason="Issue label filter \"${ISSUE_LABEL}\" specified but issue has no labels"
     set_output "reason" "${reason}"
@@ -226,11 +230,11 @@ apply_label_filter() {
     echo "::endgroup::"
     return 1  # Signal to exit main
   fi
-  
+
   local labels_lower issue_label_lower
   labels_lower=$(to_lowercase "${labels}")
   issue_label_lower=$(to_lowercase "${ISSUE_LABEL}")
-  
+
   local label_matches=false
   while IFS= read -r label; do
     local label_lower
@@ -241,7 +245,7 @@ apply_label_filter() {
       break
     fi
   done <<< "${labels_lower}"
-  
+
   if [[ "${label_matches}" != "true" ]]; then
     local labels_list
     labels_list=$(echo "${labels_lower}" | tr '\n' ',')
@@ -252,7 +256,7 @@ apply_label_filter() {
     echo "::endgroup::"
     return 1  # Signal to exit main
   fi
-  
+
   echo "::notice::Issue label matches filter: found matching label"
   echo "::endgroup::"
   return 0
@@ -261,7 +265,7 @@ apply_label_filter() {
 # Assign the issue to the target milestone
 assign_milestone() {
   echo "::group::Assigning milestone"
-  
+
   if gh issue edit "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --milestone "${TARGET_MILESTONE}" 2>/dev/null; then
     local reason="Successfully assigned issue to milestone: ${TARGET_MILESTONE}"
     set_output "assigned" "true"
@@ -274,7 +278,7 @@ assign_milestone() {
     echo "::error::${reason}"
     exit 1
   fi
-  
+
   echo "::endgroup::"
 }
 
@@ -283,10 +287,10 @@ assign_milestone() {
 
 main() {
   validate_inputs
-  
+
   local issue_data
   issue_data=$(fetch_issue_data)
-  
+
   # Check filters - if any return 1, exit gracefully
   # SC2310: Intentionally using || to handle filter rejections
   # shellcheck disable=SC2310
@@ -295,7 +299,7 @@ main() {
   apply_type_filter "${issue_data}" || exit 0
   # shellcheck disable=SC2310
   apply_label_filter "${issue_data}" || exit 0
-  
+
   assign_milestone
 }
 
