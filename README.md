@@ -17,22 +17,22 @@ A GitHub Action that automatically assigns issues to milestones based on specifi
 
 ```yaml
 - name: Assign Issue to Milestone
-  uses: davidizzy/issue-milestoner@v1
+  uses: davidizzy/issue-milestoner@v1.1.1 # x-release-please-version
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     issue-number: ${{ github.event.issue.number }}
-    target-milestone: "v1.0.0"
+    target-milestone: "my-important-milestone"
 ```
 
 ### Advanced Usage with Issue Type Filter
 
 ```yaml
 - name: Assign Bug Issues to Milestone
-  uses: davidizzy/issue-milestoner@v1
+  uses: davidizzy/issue-milestoner@v1.1.1 # x-release-please-version
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     issue-number: ${{ github.event.issue.number }}
-    target-milestone: "v1.0.0"
+    target-milestone: "my-important-milestone"
     issue-type: "bug"  # GitHub issue type
 ```
 
@@ -40,11 +40,11 @@ A GitHub Action that automatically assigns issues to milestones based on specifi
 
 ```yaml
 - name: Assign Enhancement Issues to Milestone  
-  uses: davidizzy/issue-milestoner@v1
+  uses: davidizzy/issue-milestoner@v1.1.1 # x-release-please-version
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     issue-number: ${{ github.event.issue.number }}
-    target-milestone: "v1.0.0"
+    target-milestone: "my-important-milestone"
     issue-label: "enhancement"  # Issue label
 ```
 
@@ -55,7 +55,7 @@ name: Auto Milestone Assignment
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, typed]
 
 permissions:
   issues: write
@@ -66,11 +66,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Assign to Current Sprint
-        uses: davidizzy/issue-milestoner@v1
+        uses: davidizzy/issue-milestoner@v1.1.1 # x-release-please-version
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.issue.number }}
-          target-milestone: "Sprint 24"
+          target-milestone: "Unscheduled Features"
           issue-type: "feature"  # Only assign feature type issues
 ```
 
@@ -165,4 +165,3 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - **Issues**: [Create an issue](https://github.com/davidizzy/issue-milestoner/issues/new) for bugs or feature requests
-- **Discussions**: Use GitHub Discussions for questions and help

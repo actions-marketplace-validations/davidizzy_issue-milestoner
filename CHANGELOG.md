@@ -1,3 +1,4 @@
+<!-- markdownlint-disable -->
 # Changelog
 
 ## [1.1.1](https://github.com/davidizzy/issue-milestoner/compare/v1.1.0...v1.1.1) (2025-11-13)
