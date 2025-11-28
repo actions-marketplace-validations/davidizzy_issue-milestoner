@@ -1,3 +1,5 @@
+![issue-milestoner](https://socialify.git.ci/davidizzy/issue-milestoner/image?description=1&language=1&name=1&owner=1&pattern=Formal+Invitation&theme=Auto)
+
 # Issue Milestoner
 
 A GitHub Action that automatically assigns issues to milestones based on specified criteria.
