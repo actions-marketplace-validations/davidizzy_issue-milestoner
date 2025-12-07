@@ -1,3 +1,10 @@
+# This workflow tests the issue-milestoner action by creating a test issue
+# assigned to a pull request author, invoking the action to assign a 
+# milestone, and verifying the assignment.
+# It can be triggered manually via workflow_dispatch.
+# If running in a fork of this repo, ensure (1) the label "automated-test"
+# and (2) a milestone called "pr-check-milestone" exist.
+
 name: Test Issue Milestoner
 on:
   workflow_call:
@@ -40,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # ratchet:actions/checkout@v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # ratchet:actions/checkout@v6.0.0
       - name: Set test context
         id: test-info
         run: |
